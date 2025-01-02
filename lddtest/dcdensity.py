@@ -5,7 +5,6 @@ import pandas as pd
 import scipy.stats
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from sklearn.linear_model import LinearRegression
 
 from lddtest.utils import round_to_integer
 
@@ -34,7 +33,7 @@ def dcdensity(
         bin_size = 2 * running_std * N**-0.5  # p. 705 (McCrary, 2008)
 
     left_bin = _get_midpoint(r=running_min, bin_size=bin_size, cutoff=cutoff) # midpoint of lowest bin
-    right = _get_midpoint(r=running_max, bin_size=bin_size, cutoff=cutoff)  # midpoint of highest bin
+    right_bin = _get_midpoint(r=running_max, bin_size=bin_size, cutoff=cutoff)  # midpoint of highest bin
     left_cut = cutoff - bin_size / 2  # midpoint of bin just left of cutoff
     right_cut = cutoff + bin_size / 2  # midpoint of bin just right of cutoff
     j = math.floor((running_max - running_min) / bin_size) + 2
@@ -60,33 +59,35 @@ def dcdensity(
     ) * bin_size + bin_size / 2 + cutoff
 
     if bandwidth is None:
-        # calculate bandwidth
-        bin_left = round_to_integer(
+        # calculate bandwidth following Section 3.2 in (McCrary, 2008)
+        # number of bin just left of cutoff
+        bin_number_left = round_to_integer(
             (
-                ((math.floor((left_cut - cutoff) / bin_size) * bin_size + bin_size / 2 + cutoff) - left_bin)
+                (_get_midpoint(r=left_cut, cutoff=cutoff, bin_size=bin_size) - left_bin)
                 / bin_size
             ) + 1
         )
-        bin_right = round_to_integer(
+        # number of bin just right of cuttof
+        bin_number_right = round_to_integer(
             (
-                ((math.floor((right_cut - cutoff) / bin_size) * bin_size + bin_size / 2 + cutoff) - left_bin)
+                (_get_midpoint(r=right_cut, cutoff=cutoff, bin_size=bin_size) - left_bin)
                 / bin_size
             ) + 1
         )
-        if bin_right - bin_left != 1:
-            raise ValueError()
+        if bin_number_right - bin_number_left != 1:
+            raise ValueError('Bins do not align!')
 
-        cell_midpoints_left = bin_midpoints[:bin_left]
-        cell_midpoints_right = bin_midpoints[bin_right:]
+        cell_midpoints_left = bin_midpoints[:bin_number_left]
+        cell_midpoints_right = bin_midpoints[bin_number_right:]
 
         # estimate 4th order polynomial to the left
         data = pd.DataFrame(
             data=np.vstack((bin_counts, bin_midpoints)).T,
-            columns=['cells', 'midpoints'],
+            columns=['counts', 'midpoints'],
         )
         subsets = {
             left_bin: (cell_midpoints_left, bin_midpoints < cutoff),
-            right: (cell_midpoints_right, bin_midpoints >= cutoff),
+            right_bin: (cell_midpoints_right, bin_midpoints >= cutoff),
         }
         bandwidth = [
             _get_bandwidth(
@@ -95,6 +96,8 @@ def dcdensity(
                 data=data,
                 subset=subset,
                 cutoff=cutoff,
+                endogenous='counts',
+                exogenous='midpoints',
             )
             for midpoint, (midpoints, subset) in subsets.items()
         ]
@@ -106,7 +109,7 @@ def dcdensity(
         ValueError('Insufficient data within the bandwidth.')
 
     if do_plot:
-        raise NotImplementedError
+        raise NotImplementedError('Density plot not yet implemented.')
 
     # add padding zeros to histogram (to assist smoothing)
     padzeros = math.ceil(bandwidth / bin_size)
@@ -128,8 +131,8 @@ def dcdensity(
                 ),
                 bin_midpoints,
                 np.arange(
-                    start=right + bin_size,
-                    stop=right + padzeros * bin_size + bin_size,
+                    start=right_bin + bin_size,
+                    stop=right_bin + padzeros * bin_size + bin_size,
                     step=bin_size,
                 ),
             )
@@ -203,7 +206,7 @@ def _get_bandwidth(
         data: pd.DataFrame,
         subset: np.typing.ArrayLike,
         cutoff: float,
-        endogenous: str = 'cells',
+        endogenous: str = 'counts',
         exogenous: str = 'midpoints',
         degree: int = 4,
         kappa: float = 3.348,
@@ -213,7 +216,7 @@ def _get_bandwidth(
     regressors = [
         f'I({exogenous} ** {order})' for order in degrees
     ]
-    formula = f'{endogenous} ~ {"+".join(regressors)}'
+    formula = f'{endogenous} ~ {" + ".join(regressors)}'
     model = smf.ols(
         formula=formula,
         data=data,
@@ -236,8 +239,8 @@ def _get_bandwidth(
         ]
     )
     bandwidth = kappa * (
-        fit.mse_model * abs(cutoff - midpoint)
-        / np.square(second_derivative[:, None] * xs).sum()
+        fit.mse_resid * abs(cutoff - midpoint)
+        / np.square(np.sum(second_derivative[:, None] * xs, axis=0)).sum()
     ) ** (1/5)
     return bandwidth
 

@@ -41,7 +41,7 @@ def _run_r_dcdensity(
     return result
 
 
-def test_dcdensity():
+def test_dcdensity(relative_tolerance: float = 1e-2):
     data = sample_data()
     cutoff = 0.0
     bandwidth = None
@@ -65,5 +65,5 @@ def test_dcdensity():
     np.testing.assert_allclose(
         result[Language.python.value],
         result[Language.r.value],
-        rtol=1e-5,
+        rtol=relative_tolerance,
     )

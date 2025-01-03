@@ -6,6 +6,7 @@ import scipy.stats
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
+from lddtest.enums import DcdensityResults
 from lddtest.utils import round_to_integer
 
 # https://www.sciencedirect.com/science/article/pii/S0304407607001133
@@ -124,17 +125,19 @@ def dcdensity(
         )
         bin_midpoints_padded = np.concatenate(
             (
-                np.arange(
+                np.linspace(
                     start=left_bin - padzeros * bin_size,
                     stop=left_bin,
-                    step=bin_size,
+                    num=padzeros,
+                    endpoint=True,  # include stop
                 ),
                 bin_midpoints,
-                np.arange(
+                np.linspace(
                     start=right_bin + bin_size,
-                    stop=right_bin + padzeros * bin_size + bin_size,
-                    step=bin_size,
-                ),
+                    stop=right_bin + padzeros * bin_size,
+                    num=padzeros,
+                    endpoint=True,  # include stop
+                )
             )
         )
     else:
@@ -183,17 +186,17 @@ def dcdensity(
         * (1/density_right_estimate + 1/density_left_estimate)
     )
     z_stat = theta_hat / theta_hat_se
-    p_value = 2 * (1 - scipy.stats.norm.cdf(np.abs(z_stat)))
+    p_value = 2 * scipy.stats.norm.sf(np.abs(z_stat))
 
     results = pd.Series(
         {
-            'density discontinuity (log difference)': theta_hat,
-            'density discontinuity (standard error)': theta_hat_se,
-            'z-statistic': z_stat,
-            'p-value': p_value,
-            'bandwidth': bandwidth,
-            'bin size': bin_size,
-            'cutoff': cutoff,
+            DcdensityResults.estimate: theta_hat,
+            DcdensityResults.standard_error: theta_hat_se,
+            DcdensityResults.z_stat: z_stat,
+            DcdensityResults.p_value: p_value,
+            DcdensityResults.bandwidth: bandwidth,
+            DcdensityResults.bin_size: bin_size,
+            DcdensityResults.cutoff: cutoff,
         },
         name='results'
     )
@@ -253,6 +256,7 @@ def _get_midpoint(
     return np.floor(
         (r - cutoff) / bin_size
     ) * bin_size + bin_size / 2 + cutoff
+
 
 def _get_bin_numbers(
         running: np.typing.ArrayLike,

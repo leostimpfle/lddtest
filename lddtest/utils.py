@@ -1,4 +1,5 @@
 import decimal
+import typing
 import numpy as np
 
 
@@ -24,7 +25,13 @@ def round_to_integer(number: np.typing.NDArray[float]) -> np.typing.NDArray[int]
 def sample_data(
         number_observations: int = 100_000,
         seed: int = 42,
-):
+        number_clusters: int = 1,
+) -> typing.Tuple[np.typing.NDArray[float], np.typing.NDArray[int]]:
     np.random.seed(seed)
     running = np.random.standard_normal(number_observations)
-    return running
+    clusters = np.random.randint(
+        low=0,
+        high=number_clusters,
+        size=number_observations,
+    )
+    return running, clusters

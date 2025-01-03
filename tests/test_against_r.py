@@ -45,7 +45,7 @@ def _run_r_dcdensity(
             for i, name in enumerate(result.names)
             if name in keep_names
         },
-        name=Language.r.value,
+        name=Language.r,
     )
     return result
 
@@ -65,15 +65,15 @@ def test_dcdensity(relative_tolerance: float = 1e-2):
         bandwidth=bandwidth,
     )
     result = result_python.to_frame(
-        Language.python.value
+        Language.python
     ).join(
         result_r,
         how='left',
         validate='one_to_one',
     )
     np.testing.assert_allclose(
-        result[Language.python.value],
-        result[Language.r.value],
+        result[Language.python],
+        result[Language.r],
         rtol=relative_tolerance,
     )
 
@@ -122,21 +122,24 @@ def _run_r_lddtest(
         'Equivalence z-statistic': LddtestResults.z_stat_equivalence,
         'p-value': LddtestResults.p_value_equivalence,
     }
-    result = output[0]
     result = pd.Series(
         {
-            keep_names[name]: result[i][0]
-            for i, name in enumerate(result.names)
+            keep_names[name]: str(output[0][i][0])
+            for i, name in enumerate(output[0].names)
             if name in keep_names
         },
-        name=Language.r.value,
+        name=Language.r,
     )
-    result = result.loc[[n for n in LddtestResults]]
+    result = pd.to_numeric(result, errors='coerce')
+    result = result.loc[[n for n in LddtestResults if n in result.index]]
     return result
 
 
-def test_lddtest(relative_tolerance: float = 0.5):
-    number_observations = 100_000
+def test_lddtest(
+        absolute_tolerance: float = 1e-1,
+        relative_tolerance: float = 1e-2,
+):
+    number_observations = 10_000
     number_clusters = 10
     running, clusters = sample_data(
         number_observations=number_observations,
@@ -163,20 +166,31 @@ def test_lddtest(relative_tolerance: float = 0.5):
         alpha=alpha,
     )
     result = result_python.to_frame(
-        Language.python.value
+        Language.python
     ).join(
         result_r,
         how='left',
         validate='one_to_one',
     )
-    exclude = [
-        # TODO: why does this differ between Python and R?
-        LddtestResults.number_observations_effective,
-        LddtestResults.z_stat_equivalence,
-        LddtestResults.p_value_equivalence,
+    test_absolute = [
+        LddtestResults.estimate,
+        LddtestResults.standard_error,
+        LddtestResults.confidence_lower_equivalence,
+        LddtestResults.confidence_upper_equivalence,
+        LddtestResults.epsilon_lower,
+        LddtestResults.epsilon_upper,
     ]
     np.testing.assert_allclose(
-        result.loc[~result.index.isin(exclude), Language.python.value],
-        result.loc[~result.index.isin(exclude), Language.r.value],
+        result.loc[result.index.isin(test_absolute), Language.python],
+        result.loc[result.index.isin(test_absolute), Language.r],
+        atol=absolute_tolerance,
+    )
+    test_relative = [
+        LddtestResults.number_observations,
+        LddtestResults.number_observations_effective,
+    ]
+    np.testing.assert_allclose(
+        result.loc[result.index.isin(test_relative), Language.python],
+        result.loc[result.index.isin(test_relative), Language.r],
         rtol=relative_tolerance,
     )

@@ -1,14 +1,13 @@
 import numpy as np
 import plotly.express as px
-from scipy.stats import alpha
 
 import lddtest
 from lddtest.utils import sample_data
 
 if __name__ == '__main__':
     seed = 42
-    N = 1_000_000
-    N_clusters = 1_000
+    N = 1_0_000
+    N_clusters = 1_00
     running, clusters = sample_data(
         number_observations=N,
         seed=seed,

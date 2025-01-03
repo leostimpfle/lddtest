@@ -1,6 +1,6 @@
 import enum
 
-class Language(enum.Enum):
+class Language(enum.StrEnum):
     python = 'Python'
     r = 'R'
     stata = 'Stata'
@@ -27,3 +27,4 @@ class LddtestResults(enum.StrEnum):
     epsilon_upper = "Epsilon upper"
     number_observations = "Observations"
     number_observations_effective = "Effective observations"
+    bandwidth = 'Bandwidth'

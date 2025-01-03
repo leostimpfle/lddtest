@@ -39,9 +39,9 @@ def lddtest(
     # number of observations
     notnull = ~np.isnan(running)
     is_within_bandwidth = (
-            running > cutoff - density_test[DcdensityResults.bandwidth]
+            running >= (cutoff - density_test[DcdensityResults.bandwidth])
     ) & (
-            running <= cutoff + density_test[DcdensityResults.bandwidth]
+            running <= (cutoff + density_test[DcdensityResults.bandwidth])
     )
     if clusters is not None:
         notnull &= ~np.isnan(clusters)
@@ -56,6 +56,7 @@ def lddtest(
             ).sum(),
             LddtestResults.epsilon_lower: rope[0],
             LddtestResults.epsilon_upper: rope[1],
+            LddtestResults.bandwidth: density_test[DcdensityResults.bandwidth],
         }
     )
 
@@ -88,7 +89,7 @@ def lddtest(
         )
         z_stat = estimate / standard_error  # TODO: is this correct?
         p_value = (
-            (estimates > rope[0]) & (estimates <= rope[1])
+            (estimates >= rope[0]) & (estimates <= rope[1])
         ).sum() / bootstrap_iterations
 
     output.update(
@@ -113,6 +114,9 @@ def _boostrap(
         seed: int = 42,
 ) -> np.typing.NDArray[float]:
     unique_clusters = None if clusters is None else np.unique(clusters)
+    if unique_clusters < 2:
+        # nothing to cluster
+        clusters = None
     cutoff = dcdensity_results[DcdensityResults.cutoff]
     bin_size = dcdensity_results[DcdensityResults.bin_size]
     bandwidth = dcdensity_results[DcdensityResults.bandwidth]

@@ -59,7 +59,7 @@ def test_dcdensity(relative_tolerance: float = 1e-2):
         cutoff=cutoff,
         bandwidth=bandwidth,
     )
-    result_python = lddtest.dcdensity(
+    result_python, _, _ = lddtest.dcdensity(
         running=running,
         cutoff=cutoff,
         bandwidth=bandwidth,

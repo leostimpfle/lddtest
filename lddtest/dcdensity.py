@@ -5,8 +5,14 @@ import pandas as pd
 import scipy.stats
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+try:
+    import plotly.graph_objects as go
+    has_plotly = True
+except ModuleNotFoundError:
+    has_plotly = False
 
 from lddtest.enums import DcdensityResults
+from lddtest.kernel import Triangular
 from lddtest.utils import round_to_integer
 
 # https://www.sciencedirect.com/science/article/pii/S0304407607001133
@@ -19,7 +25,8 @@ def dcdensity(
         bin_size: typing.Optional[float] = None,
         bandwidth: typing.Optional[float] = None,
         do_plot: bool = False,
-) -> pd.Series:
+        alpha: float = 0.05,
+) -> typing.Tuple[pd.Series, pd.DataFrame, typing.Union[None, go.Figure]]:
     N = running.shape[0]
     running_std = np.std(running)
     running_min = np.min(running)
@@ -110,7 +117,16 @@ def dcdensity(
         ValueError('Insufficient data within the bandwidth.')
 
     if do_plot:
-        raise NotImplementedError('Density plot not yet implemented.')
+        plot_data, fig = _density_plot(
+            bin_midpoints=bin_midpoints,
+            bin_counts=bin_counts,
+            running_std=running_std,
+            cutoff=cutoff,
+            bandwidth=bandwidth,
+            alpha=alpha,
+        )
+    else:
+        plot_data, fig = None, None
 
     # add padding zeros to histogram (to assist smoothing)
     padzeros = math.ceil(bandwidth / bin_size)
@@ -200,7 +216,7 @@ def dcdensity(
         },
         name='results'
     )
-    return results
+    return results, plot_data, fig
 
 
 def _get_bandwidth(
@@ -271,3 +287,119 @@ def _get_bin_numbers(
         + 1
     )
     return bin_numbers
+
+
+def _density_plot(
+        bin_midpoints: np.typing.ArrayLike,
+        bin_counts: np.typing.ArrayLike,
+        running_std: float,
+        cutoff: float,
+        bandwidth: float,
+        alpha: float = 0.05,
+) -> typing.Tuple[pd.DataFrame, typing.Union[None, go.Figure]]:
+    # estimate density to either side of the cutoff using local linear regressions with triangular kernel
+    selectors = (
+        bin_midpoints < cutoff,
+        bin_midpoints >= cutoff,
+    )
+    predictions = {}
+    for selector in selectors:
+        midpoints = bin_midpoints[selector]
+        counts = bin_counts[selector]
+        for i in range(midpoints.shape[0]):
+            distance = midpoints - midpoints[i]
+            weights = Triangular(
+                x=distance,
+                center=0,
+                bandwidth=bandwidth,
+            ).weights
+            # local linear regression
+            prediction = sm.WLS(
+                endog=counts,
+                exog=sm.add_constant(distance),
+                weights=weights,
+            ).fit(
+                # fit model
+            ).get_prediction(
+                # get prediction at cutoff
+                exog=[1, 0]
+            ).summary_frame(
+                alpha=alpha
+            )
+            predictions.update(
+                {midpoints[i]: prediction.squeeze().rename('value')}
+            )
+
+    plot_data = pd.concat(
+        predictions,
+        names=['midpoint', 'variable'],
+    ).unstack('variable')
+    # add bin counts
+    plot_data['empirical_density'] = bin_counts
+    plot_data.reset_index(inplace=True)
+    pmin = cutoff - 2 * running_std
+    pmax = cutoff + 2 * running_std
+    r = (bin_midpoints >= pmin) & (bin_midpoints <= pmax)
+    if has_plotly:
+        fig = _create_plotly_fig(
+            plot_data=plot_data,
+            selectors=selectors,
+            range_x=(pmin, pmax),
+            range_y=(bin_counts[r].min()*0.95, bin_counts[r].max()*1.05),
+        )
+    else:
+        # can't produce plotly figure
+        fig = None
+    return plot_data, fig
+
+
+def _create_plotly_fig(
+        plot_data: pd.DataFrame,
+        selectors: typing.Tuple[np.typing.ArrayLike, np.typing.ArrayLike],
+        range_x: typing.Tuple[float, float],
+        range_y: typing.Tuple[float, float],
+) -> go.Figure:
+    figs = [
+        # empirical density
+        go.Scatter(
+            x=plot_data['midpoint'],
+            y=plot_data['empirical_density'],
+            mode='markers',
+            marker=dict(color='black'),
+            showlegend=False,
+        ),
+    ]
+    for selector in selectors:
+        figs.extend(
+            [
+                # fitted density left
+                go.Scatter(
+                    x=plot_data.loc[selector, 'midpoint'],
+                    y=plot_data.loc[selector, 'mean'],
+                    mode='lines',
+                    line=dict(color='black'),
+                    showlegend=False
+                ),
+                go.Scatter(
+                    x=plot_data.loc[selector, 'midpoint'],
+                    y=plot_data.loc[selector, 'mean_ci_lower'],
+                    mode='lines',
+                    line=dict(color='black', dash='dash'),
+                    showlegend=False,
+                ),
+                go.Scatter(
+                    x=plot_data.loc[selector, 'midpoint'],
+                    y=plot_data.loc[selector, 'mean_ci_upper'],
+                    mode='lines',
+                    line=dict(color='black', dash='dash'),
+                    showlegend=False
+                ),
+            ]
+        )
+    fig = go.Figure(figs)
+    fig.update_xaxes(range=range_x)
+    fig.update_yaxes(
+        tickformat='.0%',
+        range=range_y
+    )
+    return fig

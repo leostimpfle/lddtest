@@ -7,8 +7,8 @@ class Language(enum.StrEnum):
 
 
 class DcdensityResults(enum.StrEnum):
-    estimate = 'Density discontinuity (log difference)',
-    standard_error = 'Density discontinuity (standard error)',
+    estimate = 'Density discontinuity (log difference)'
+    standard_error = 'Density discontinuity (standard error)'
     z_stat = 'z-statistic'
     p_value = 'p-value'
     bandwidth = 'Bandwidth'

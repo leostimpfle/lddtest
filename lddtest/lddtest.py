@@ -21,7 +21,7 @@ def lddtest(
 ) -> pd.Series:
     output = {}
     # perform McCrary density test
-    density_test = dcdensity(
+    density_test, _, _ = dcdensity(
         running=running,
         cutoff=cutoff,
         bin_size=bin_size,
@@ -114,7 +114,7 @@ def _boostrap(
         seed: int = 42,
 ) -> np.typing.NDArray[float]:
     unique_clusters = None if clusters is None else np.unique(clusters)
-    if unique_clusters < 2:
+    if unique_clusters.shape[0] < 2:
         # nothing to cluster
         clusters = None
     cutoff = dcdensity_results[DcdensityResults.cutoff]
@@ -141,7 +141,7 @@ def _boostrap(
             # skip because sample does not include cutoff
             continue
         # TODO: try/excpt https://github.com/jack-fitzgerald/eqtesting/blob/67efc874ce9bf9b9f43b29db484614f740605af9/R/lddtest.R#L221
-        result = dcdensity(
+        result, _, _ = dcdensity(
             running=random_sample,
             cutoff=cutoff,
             bin_size=bin_size,

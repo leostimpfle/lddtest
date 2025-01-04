@@ -16,18 +16,19 @@ if __name__ == '__main__':
     cutoff = 0.0
     bin_size = None
     bandwidth = None
-    # px.histogram(running)
-    # result = lddtest.dcdensity(
-    #     running=running,
-    #     cutoff=cutoff,
-    #     bin_size=bin_size,
-    #     bandwidth=bandwidth,
-    # )
-    result = lddtest.lddtest(
+    px.histogram(running)
+    result, plot_data, fig = lddtest.dcdensity(
         running=running,
         cutoff=cutoff,
         bin_size=bin_size,
         bandwidth=bandwidth,
-        epsilon=1.5,
-        alpha=0.05,
+        do_plot=True,
     )
+    # result = lddtest.lddtest(
+    #     running=running,
+    #     cutoff=cutoff,
+    #     bin_size=bin_size,
+    #     bandwidth=bandwidth,
+    #     epsilon=1.5,
+    #     alpha=0.05,
+    # )

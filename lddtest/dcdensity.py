@@ -368,6 +368,7 @@ def _create_plotly_fig(
             mode='markers',
             marker=dict(color='black'),
             showlegend=False,
+            name='density (empirical)',
         ),
     ]
     for selector in selectors:
@@ -379,7 +380,8 @@ def _create_plotly_fig(
                     y=plot_data.loc[selector, 'mean'],
                     mode='lines',
                     line=dict(color='black'),
-                    showlegend=False
+                    showlegend=False,
+                    name='density (fitted)',
                 ),
                 go.Scatter(
                     x=plot_data.loc[selector, 'midpoint'],
@@ -387,13 +389,15 @@ def _create_plotly_fig(
                     mode='lines',
                     line=dict(color='black', dash='dash'),
                     showlegend=False,
+                    name='confidence interval (lower)'
                 ),
                 go.Scatter(
                     x=plot_data.loc[selector, 'midpoint'],
                     y=plot_data.loc[selector, 'mean_ci_upper'],
                     mode='lines',
                     line=dict(color='black', dash='dash'),
-                    showlegend=False
+                    showlegend=False,
+                    name='confidence interval (upper)',
                 ),
             ]
         )

@@ -6,6 +6,7 @@ import rpy2.robjects
 from rpy2.robjects import FloatVector, NULL, pandas2ri
 
 import lddtest
+import lddtest.hartman
 from lddtest.utils import sample_data
 from lddtest.enums import Language, LddtestResults, DcdensityResults
 
@@ -192,5 +193,51 @@ def test_lddtest(
     np.testing.assert_allclose(
         result.loc[result.index.isin(test_relative), Language.python],
         result.loc[result.index.isin(test_relative), Language.r],
+        rtol=relative_tolerance,
+    )
+
+
+def _run_r_hartman_density(
+        estimate_density_left: float,
+        estimate_density_right: float,
+        standard_error_left: float,
+        standard_error_right: float,
+):
+    install_functions = '''
+    devtools::source_url("https://github.com/ekhartman/rdd_equivalence/blob/f3836d2d4cf663e86a9b69752cc28b0a521f556f/RDD_equivalence_functions.R?raw=TRUE")
+    '''
+    rpy2.robjects.r(install_functions)
+    run_function = f'rdd.tost.ratio({estimate_density_left}, {estimate_density_right}, {standard_error_left}, {standard_error_right})'
+    r = rpy2.robjects.r(run_function)
+    result = pd.Series([v[0] for v in r], index=r.names, name=Language.r)
+    return result
+
+
+
+def test_hartman_density(relative_tolerance: float = 1e-4):
+    estimate_density_left = 0.01166309
+    estimate_density_right = 0.01192887
+    standard_error_left = 0.0001497246
+    standard_error_right = 0.0001465601
+    result_r = _run_r_hartman_density(
+        estimate_density_left=estimate_density_left,
+        estimate_density_right=estimate_density_right,
+        standard_error_left=standard_error_left,
+        standard_error_right=standard_error_right,
+    )
+    p_value_python, eci_python = lddtest.hartman.equivalence_density(
+        estimate_density_left=estimate_density_left,
+        estimate_density_right=estimate_density_right,
+        standard_error_left=standard_error_left,
+        standard_error_right=standard_error_right,
+    )
+    result_python = pd.Series(
+        [p_value_python, eci_python],
+        index=result_r.index,
+        name=Language.python,
+    )
+    np.testing.assert_allclose(
+        result_python,
+        result_r,
         rtol=relative_tolerance,
     )

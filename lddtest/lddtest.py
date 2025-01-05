@@ -2,11 +2,14 @@ import math
 import typing
 import pandas as pd
 import numpy as np
-import scipy.stats
+from scipy.stats import norm
 
 from lddtest.dcdensity import dcdensity
 from lddtest.enums import DcdensityResults, LddtestResults
 
+# Fitzgerald, Jack 2024: Manipulation Tests in Regression Discontinuity Design: The Need for Equivalence Testing
+# URL: https://www.econstor.eu/handle/10419/300277
+# Code: https://github.com/jack-fitzgerald/eqtesting
 
 def lddtest(
         running: np.typing.ArrayLike,
@@ -63,12 +66,12 @@ def lddtest(
     if not bootstrap and clusters is None:
         z_stat = (estimate - bound) / standard_error
         if index_closest_to_estimate == 0:
-            p_value = scipy.stats.cdf(z_stat)
+            p_value = norm.cdf(z_stat)
         else:
-            p_value = scipy.stats.sf(z_stat)
+            p_value = norm.sf(z_stat)
 
-        ci_left = estimate - scipy.stats.norm.ppf(1 - alpha) * standard_error
-        ci_right = estimate + scipy.stats.norm.ppf(1 - alpha) * standard_error
+        ci_left = estimate - norm.ppf(1 - alpha) * standard_error
+        ci_right = estimate + norm.ppf(1 - alpha) * standard_error
 
     else:
         # (cluster) bootstrap inference

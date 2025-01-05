@@ -15,9 +15,10 @@ from lddtest.enums import DcdensityResults
 from lddtest.kernel import Triangular
 from lddtest.utils import round_to_integer
 
-# https://www.sciencedirect.com/science/article/pii/S0304407607001133
-# https://eml.berkeley.edu/~jmccrary/DCdensity/
-# https://github.com/ddimmery/rdd/blob/master/DCdensity.R
+# McCrary, Justin 2008: Manipulation of the running variable in the regression discontinuity design: A density test
+# DOI: 10.1016/j.jeconom.2007.05.005
+# Stata code: https://eml.berkeley.edu/~jmccrary/DCdensity/
+# R implementation: https://github.com/ddimmery/rdd/blob/master/DCdensity.R
 
 def dcdensity(
         running: np.typing.ArrayLike,

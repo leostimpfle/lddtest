@@ -225,14 +225,14 @@ def test_hartman_density(relative_tolerance: float = 1e-4):
         standard_error_left=standard_error_left,
         standard_error_right=standard_error_right,
     )
-    p_value_python, eci_python = lddtest.hartman.equivalence_density(
+    result_python = lddtest.hartman.equivalence_density(
         estimate_density_left=estimate_density_left,
         estimate_density_right=estimate_density_right,
         standard_error_left=standard_error_left,
         standard_error_right=standard_error_right,
     )
     result_python = pd.Series(
-        [p_value_python, eci_python],
+        [result_python.p_value, result_python.eci[1]],
         index=result_r.index,
         name=Language.python,
     )

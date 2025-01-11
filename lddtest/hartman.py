@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 import warnings
 
@@ -5,9 +6,31 @@ import numpy as np
 from scipy.stats import norm, ncx2
 from scipy.optimize import brentq
 
+
 # Hartman, Erin 2021: Equivalence Testing for Regression Discontinuity Designs
 # DOI: 10.1017/pan.2020.43
 # Code: https://github.com/ekhartman/rdd_equivalence
+
+@dataclasses.dataclass
+class ResultsEquivalence:
+    estimate: float
+    standard_error: float
+    eci: float
+    epsilon: float
+    alpha: float
+    p_value: float
+    success: bool
+
+
+@dataclasses.dataclass
+class ResultsEquivalenceDensity:
+    ratio: float
+    eci: typing.Tuple[float, float]
+    epsilon: float
+    alpha: float
+    p_value: float
+    success: bool
+
 
 def tost(
         estimate: float,
@@ -36,7 +59,7 @@ def equivalence(
         alpha: float = 0.05,
         search_tolerance: float = 1e-3,
         max_search_grid: float = 3.0,
-) -> typing.Tuple[float, float]:
+) -> ResultsEquivalence:
     if not epsilon > 0:
         raise ValueError("Epsilon must be strictly positive.")
 
@@ -50,19 +73,36 @@ def equivalence(
     if ncx2.cdf(estimate**2 / standard_error**2, df=1, nc=0) < alpha:
         # if noncentrality parameter estimate is so close to zero that p < alpha, return NA
         inverted = np.nan
+        success = False
     else:
-        inverted, result = brentq(
-            f=lambda x: test_statistic(x) - alpha,
-            a=1e-5,
-            b=max(10.0, max_search_grid * abs(estimate)*standard_error),
-            xtol=search_tolerance,
-            full_output=True,
-            disp=False,
-        )
-        if not result.converged:
-            warnings.warn('Unable to find equivalence confidence interval.')
+        try:
+            inverted, result = brentq(
+                f=lambda x: test_statistic(x) - alpha,
+                a=1e-5,
+                b=max(10.0, max_search_grid * abs(estimate)*standard_error),
+                xtol=search_tolerance,
+                full_output=True,
+                disp=False,
+            )
+            success = result.converged
+        except ValueError:
             inverted = np.nan
-    return p_value, inverted
+            success = False
+
+    if not success:
+        warnings.warn('Unable to find equivalence confidence interval.')
+        inverted = np.nan
+
+    result = ResultsEquivalence(
+        estimate=estimate,
+        standard_error=standard_error,
+        eci=inverted,
+        epsilon=epsilon,
+        alpha=alpha,
+        p_value=p_value,
+        success=success,
+    )
+    return result
 
 
 def equivalence_density(
@@ -72,7 +112,7 @@ def equivalence_density(
         standard_error_right: float,
         epsilon: float = 1.5,
         alpha: float = 0.05,
-) -> typing.Tuple[float, float]:
+) -> ResultsEquivalenceDensity:
     if not epsilon > 0:
         raise ValueError("Epsilon must be strictly positive.")
 
@@ -90,7 +130,6 @@ def equivalence_density(
     # calculate p-value
     p_value = max(norm.sf(t1(epsilon)), norm.cdf(t2(epsilon)))
     # construct equivalence confidence interval
-    inverted = np.nan
     try:
         inverted, result = brentq(
             f=lambda x: max(norm.sf(t1(x)), norm.cdf(t2(x))) - alpha,
@@ -102,9 +141,18 @@ def equivalence_density(
         )
         success = result.converged
     except ValueError:
+        inverted = np.nan
         success = False
 
     if not success:
         warnings.warn('Unable to find equivalence confidence interval.')
 
-    return p_value, inverted
+    result = ResultsEquivalenceDensity(
+        ratio=estimate_density_right / estimate_density_left,
+        eci=(1/inverted, inverted),
+        p_value=p_value,
+        epsilon=epsilon,
+        alpha=alpha,
+        success=success,
+    )
+    return result

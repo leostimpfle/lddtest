@@ -93,7 +93,7 @@ def lddtest(
         )
         z_stat = estimate / standard_error  # TODO: is this correct?
         p_value = (
-            (estimates >= rope[0]) & (estimates <= rope[1])
+            (estimates < rope[0]) | (estimates > rope[1])
         ).sum() / bootstrap_iterations
 
     output.update(

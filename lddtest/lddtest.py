@@ -1,4 +1,5 @@
 import math
+import multiprocessing
 import typing
 import pandas as pd
 import numpy as np
@@ -115,45 +116,87 @@ def _boostrap(
         clusters: typing.Optional[np.typing.ArrayLike] = None,
         max_iter: int = 1_000,
         seed: int = 42,
+        n_workers: typing.Optional[int] = -1,
 ) -> np.typing.NDArray[float]:
     unique_clusters = None if clusters is None else np.unique(clusters)
     if unique_clusters.shape[0] < 2:
         # nothing to cluster
         clusters = None
+
+    if n_workers < 0:
+        # use all available cores
+        n_workers = multiprocessing.cpu_count()
+
     cutoff = dcdensity_results[DcdensityResults.cutoff]
     bin_size = dcdensity_results[DcdensityResults.bin_size]
     bandwidth = dcdensity_results[DcdensityResults.bandwidth]
     generator = np.random.default_rng(seed=seed)
-    iteration = 0
-    estimates = []
-    # TODO: use multiprocessing
-    while iteration < max_iter:
-        iteration += 1
-        random_sample = _sample(
-            generator=generator,
-            running=running,
-            clusters=clusters,
-            unique_clusters=unique_clusters,
-        )
-        is_permissible = (
-             cutoff > random_sample.min()
-        ) & (
-            cutoff < random_sample.max()
-        )
-        if not is_permissible:
-            # skip because sample does not include cutoff
-            continue
-        # TODO: try/excpt https://github.com/jack-fitzgerald/eqtesting/blob/67efc874ce9bf9b9f43b29db484614f740605af9/R/lddtest.R#L221
-        result, _, _ = dcdensity(
-            running=random_sample,
-            cutoff=cutoff,
-            bin_size=bin_size,
-            bandwidth=bandwidth,
-        )
-        estimates.append(result[DcdensityResults.estimate])
+    if n_workers is not None:
+        # multiprocessing
+        args = [
+            (generator, running, cutoff, bin_size, bandwidth, clusters, unique_clusters)
+            for _ in range(max_iter)
+        ]
+        with multiprocessing.Pool(n_workers) as pool:
+            estimates = pool.starmap(
+                func=_iteration,
+                iterable=args,
+            )
+    else:
+        iteration = 0
+        estimates = []
+        while iteration < max_iter:
+            iteration += 1
+            result = _iteration(
+                generator=generator,
+                running=running,
+                cutoff=cutoff,
+                bin_size=bin_size,
+                bandwidth=bandwidth,
+                clusters=clusters,
+                unique_clusters=unique_clusters,
+            )
+            estimates.append(result)
 
-    estimates = np.array(estimates)
+    estimates = np.array(
+        [
+            tmp[DcdensityResults.estimate] for tmp in estimates
+        ]
+    )
     return estimates
+
+
+def _iteration(
+        generator: np.random._generator.Generator,
+        running: np.typing.ArrayLike,
+        cutoff: float,
+        bin_size: float,
+        bandwidth: float,
+        clusters: typing.Optional[np.typing.ArrayLike] = None,
+        unique_clusters: typing.Optional[np.typing.ArrayLike] = None,
+):
+    random_sample = _sample(
+        generator=generator,
+        running=running,
+        clusters=clusters,
+        unique_clusters=unique_clusters,
+    )
+    is_permissible = (
+         cutoff > random_sample.min()
+    ) & (
+        cutoff < random_sample.max()
+    )
+    if not is_permissible:
+        # skip because sample does not include cutoff
+        return
+
+    result, _, _ = dcdensity(
+        running=random_sample,
+        cutoff=cutoff,
+        bin_size=bin_size,
+        bandwidth=bandwidth,
+    )
+    return result
 
 
 def _sample(

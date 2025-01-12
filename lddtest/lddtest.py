@@ -218,18 +218,12 @@ def _sample(
             size=unique_clusters.shape[0],
             replace=True,
         )
-        tmp = np.where(
-            # array of shape (number observations, number clusters)
-            # true if i-th observation is in the j-th cluster
-            clusters[:, None] == np.repeat(
-                clusters_sampled[None, :],
-                repeats=clusters.shape[0],
-                axis=0,
-            ),
-            running[:, None],
-            np.nan,  # set to nan if i-th observation is not in j-th cluster
-        ).flatten()
-        tmp = tmp[np.isfinite(tmp)]  # drop nans (i.e., observations that are not in the sampled clusters)
+        # create clustered sample
+        tmp = np.concatenate(
+            [
+                running[clusters == cluster] for cluster in clusters_sampled
+            ]
+        )
     else:
         raise ValueError(
             'Need to provide unique clusters'

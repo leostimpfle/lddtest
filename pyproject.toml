@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "lddtest"
-version = "0.1.1"
+version = "0.1.2"
 description = ""
 authors = ["leostimpfle <leonardstimpfle@icloud.com>"]
 readme = "README.md"
